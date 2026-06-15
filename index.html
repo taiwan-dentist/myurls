@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library - 個人網址存放庫</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#FBFBFA',
+            surface: '#FFFFFF',
+            borderline: '#EAEAEA',
+            primary: '#111111',
+            muted: '#787774',
+            accentBlue: '#E1F3FE',
+            accentBlueText: '#1F6C9F',
+            accentRed: '#FDEBEC',
+            accentRedText: '#9F2F2D'
+          },
+          fontFamily: {
+            sans: ['Geist', 'sans-serif'],
+            serif: ['Newsreader', 'serif'],
+            mono: ['Geist Mono', 'monospace'],
+          },
+          boxShadow: {
+            'subtle': '0 2px 8px rgba(0,0,0,0.04)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #FBFBFA;
+      color: #111111;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    ::-webkit-scrollbar {
+      width: 0px;
+      background: transparent;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-enter {
+      animation: fadeInUp 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    .delay-1 { animation-delay: 80ms; }
+    .delay-2 { animation-delay: 160ms; }
+    .delay-3 { animation-delay: 240ms; }
+    
+    input:focus {
+      outline: none;
+      box-shadow: none;
+      border-color: #111111;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // 已將您的 Google Apps Script Web App URL 永久固定
+    const API_URL = "https://script.google.com/macros/s/AKfycbygvnhdpumdqCRE857dUQ51tXPjwEPmLQthsIwtPbLN0kIiNhw4EcN8KC0-oRQf9Nk6/exec";
+
+    function App() {
+      const [bookmarks, setBookmarks] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [isAdding, setIsAdding] = useState(false);
+      const [title, setTitle] = useState('');
+      const [url, setUrl] = useState('');
+      const [errorMsg, setErrorMsg] = useState('');
+
+      // 網頁開啟時直接向資料庫抓取現有書籤
+      useEffect(() => {
+        fetchBookmarks();
+      }, []);
+
+      const fetchBookmarks = async () => {
+        setIsLoading(true);
+        setErrorMsg('');
+        try {
+          const response = await fetch(API_URL);
+          const data = await response.json();
+          // 最新新增的書籤排序在最上方
+          setBookmarks(data.reverse());
+        } catch (error) {
+          setErrorMsg('無法讀取雲端資料，請確認 Google 試算表權限或 Apps Script 部署狀態。');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const handleAddBookmark = async (e) => {
+        e.preventDefault();
+        if (!title.trim() || !url.trim()) return;
+
+        let finalUrl = url.trim();
+        if (!/^https?:\/\//i.test(finalUrl)) {
+          finalUrl = 'https://' + finalUrl;
+        }
+
+        setIsAdding(true);
+        setErrorMsg('');
+        try {
+          // 以 text/plain 發送傳輸內容，完美繞過瀏覽器跨網域 CORS 預檢限制
+          await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ title: title.trim(), url: finalUrl })
+          });
+          
+          setTitle('');
+          setUrl('');
+          // 資料寫入試算表後，即時刷新前端介面
+          await fetchBookmarks();
+        } catch (error) {
+          setErrorMsg('雲端儲存失敗，請重新嘗試。');
+        } finally {
+          setIsAdding(false);
+        }
+      };
+
+      return (
+        <div className="min-h-[100dvh] py-24 px-6 md:px-12 max-w-5xl mx-auto">
+          {/* 標頭區域 */}
+          <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-20 animate-enter delay-1">
+            <div>
+              <h1 className="font-serif text-5xl md:text-6xl tracking-tight text-primary leading-none mb-4">
+                Library
+              </h1>
+              <p className="text-muted text-base max-w-[65ch]">
+                您的個人跨裝置網址存放庫。資料已即時連線至 Google Sheets。
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-accentBlueText bg-accentBlue px-3 py-1.5 rounded-full font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-accentBlueText animate-pulse"></span>
+              Cloud Connected
+            </div>
+          </header>
+
+          {/* 新增書籤區塊 */}
+          <section className="mb-16 animate-enter delay-2">
+            <form onSubmit={handleAddBookmark} className="bg-surface border border-borderline rounded-xl p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                <div className="md:col-span-5 flex flex-col gap-2">
+                  <label className="text-xs uppercase tracking-widest text-muted font-mono">Title</label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="專案名稱、網站標題"
+                    className="w-full border-b border-borderline bg-transparent pb-2 text-primary text-base rounded-none focus:border-primary transition-colors"
+                    disabled={isAdding}
+                  />
+                </div>
+                <div className="md:col-span-5 flex flex-col gap-2">
+                  <label className="text-xs uppercase tracking-widest text-muted font-mono">URL</label>
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="example.com"
+                    className="w-full border-b border-borderline bg-transparent pb-2 text-primary text-base font-mono rounded-none focus:border-primary transition-colors"
+                    disabled={isAdding}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={isAdding || !title.trim() || !url.trim()}
+                    className="w-full flex items-center justify-center gap-2 bg-primary text-surface rounded-md py-3 text-sm font-medium hover:bg-black active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAdding ? (
+                      <i className="ph ph-spinner animate-spin text-lg"></i>
+                    ) : (
+                      <>
+                        <i className="ph ph-plus text-lg"></i>
+                        Save
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              {errorMsg && <p className="text-accentRedText text-xs mt-4">{errorMsg}</p>}
+            </form>
+          </section>
+
+          {/* 書籤內容 Bento 網格 */}
+          <section className="animate-enter delay-3">
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-32 bg-surface border border-borderline rounded-xl p-6 animate-pulse flex flex-col justify-between">
+                    <div className="w-2/3 h-5 bg-borderline rounded-sm"></div>
+                    <div className="w-1/2 h-3 bg-borderline/50 rounded-sm"></div>
+                  </div>
+                ))}
+              </div>
+            ) : bookmarks.length === 0 ? (
+              <div className="py-24 flex flex-col items-center justify-center border border-dashed border-borderline rounded-xl bg-surface/50">
+                <i className="ph ph-bookmark-simple text-4xl text-borderline mb-4"></i>
+                <p className="text-muted text-sm">目前存放庫空無一物。在上方新增您的第一個網址。</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {bookmarks.map((bookmark, index) => (
+                  <a
+                    key={index}
+                    href={bookmark.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col justify-between bg-surface border border-borderline rounded-xl p-6 hover:shadow-subtle hover:-translate-y-[2px] transition-all duration-300"
+                  >
+                    <div className="flex justify-between items-start mb-6">
+                      <h3 className="text-primary font-medium text-lg leading-snug line-clamp-2 pr-4">
+                        {bookmark.title}
+                      </h3>
+                      <div className="bg-canvas rounded-full p-2 text-muted group-hover:text-primary group-hover:bg-accentBlue transition-colors shrink-0">
+                        <i className="ph ph-arrow-up-right text-sm"></i>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <p className="text-muted font-mono text-xs truncate">
+                        {bookmark.url.replace(/^https?:\/\/(www\.)?/, '')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block px-2 py-0.5 bg-canvas border border-borderline rounded-full text-[10px] uppercase tracking-widest text-muted">
+                          {bookmark.date ? bookmark.date.split(' ')[0] : 'Saved'}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
