@@ -101,11 +101,15 @@
         fetchBookmarks();
       }, []);
 
+      // 更新讀取書籤的 GET 請求
       const fetchBookmarks = async () => {
         setIsLoading(true);
         setErrorMsg('');
         try {
-          const response = await fetch(API_URL);
+          const response = await fetch(API_URL, {
+            method: 'GET',
+            redirect: 'follow' // 明確告知瀏覽器跟隨 Google 的 302 重新導向
+          });
           const data = await response.json();
           // 最新新增的書籤排序在最上方
           setBookmarks(data.reverse());
@@ -116,6 +120,7 @@
         }
       };
 
+       // 更新新增書籤的 POST 請求
       const handleAddBookmark = async (e) => {
         e.preventDefault();
         if (!title.trim() || !url.trim()) return;
@@ -128,15 +133,20 @@
         setIsAdding(true);
         setErrorMsg('');
         try {
-          // 以 text/plain 發送傳輸內容，完美繞過瀏覽器跨網域 CORS 預檢限制
+          // 關鍵修改區塊
           await fetch(API_URL, {
             method: 'POST',
+            redirect: 'follow', // 允許跟隨重新導向
+            headers: {
+              // 強制使用 text/plain，避免觸發瀏覽器的 OPTIONS CORS 預檢請求
+              "Content-Type": "text/plain;charset=utf-8", 
+            },
             body: JSON.stringify({ title: title.trim(), url: finalUrl })
           });
           
           setTitle('');
           setUrl('');
-          // 資料寫入試算表後，即時刷新前端介面
+          // 資料寫入後即時刷新前端
           await fetchBookmarks();
         } catch (error) {
           setErrorMsg('雲端儲存失敗，請重新嘗試。');
